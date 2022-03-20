@@ -10,3 +10,13 @@ b = "2021-10-01T08:30:00.000000000"
 print(b[0:26])
 print(datetime.datetime.strptime(
     "2021-10-01T08:30:00.000000", "%Y-%m-%dT%H:%M:%S.%f").timestamp())
+
+
+all_times = [[[] for i in range(3)] for j in range(3)]
+
+all_times[0][0].append(2)
+
+
+
+print(all_times)
+

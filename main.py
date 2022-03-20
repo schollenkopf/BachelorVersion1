@@ -1,53 +1,84 @@
-from operator import truediv
-from this import d
 import pandas as pd
 import numpy as np
 import datetime
+import statistics as stat
 
 
-def read_data(filename):
-    rawdata = pd.read_csv(filename, ";", usecols=[
-        0, 1, 2, 3, 4, 5], nrows=8114)  # More stuff to parametrize
-    actions = list(rawdata.sensor.unique())
-    return rawdata, actions
+def read_data(filename, number_columns, number_rows, event_label_column, separator):
+    rawdata = pd.read_csv(filename, separator, usecols=range(number_columns), nrows=number_rows)  # More stuff to parametrize
+    set_of_actions = list(rawdata[event_label_column].unique())
+    return rawdata, set_of_actions
 
 
-def analyze_timedistance(rawdata, actions):
-    sum_time = np.zeros((len(actions), len(actions)))
-    n_time = np.zeros((len(actions), len(actions)))
+def analyze_mean_timedistance(rawdata, set_of_actions,timestamp_column,action_column, trace_ID, number_of_traces):
+    # watch out for division by 0
+    sum_time = np.zeros((len(set_of_actions), len(set_of_actions)))
+    n_time = np.zeros((len(set_of_actions), len(set_of_actions)))
 
-    for trace in range(1, rawdata.values[-1, 0] + 1):
-        time_occurrences = {}
-        for event in rawdata[rawdata.CaseID == trace].values:
-            current_action = event[5]
-            time = event[3]
+    for trace in range(1, number_of_traces + 1):
+        timestamps_of_previous_events = {}
+        for event in rawdata[rawdata[trace_ID] == trace].values:
+            current_action = event[action_column]
+            time = event[timestamp_column]
             time = convert_to_seconds(time)
 
-            for action in time_occurrences.keys():
-                for p_time in time_occurrences[action]:
-                    sum_time[actions.index(action), actions.index(
+            for action in timestamps_of_previous_events.keys():
+                for p_time in timestamps_of_previous_events[action]:
+                    sum_time[set_of_actions.index(action), set_of_actions.index(
                         current_action)] += abs(time - p_time)
-                    n_time[actions.index(action), actions.index(
+                    n_time[set_of_actions.index(action), set_of_actions.index(
                         current_action)] += 1
-                    sum_time[actions.index(current_action),
-                             actions.index(action)] += abs(time - p_time)
-                    n_time[actions.index(current_action),
-                           actions.index(action)] += 1
+                    sum_time[set_of_actions.index(current_action),
+                             set_of_actions.index(action)] += abs(time - p_time)
+                    n_time[set_of_actions.index(current_action),
+                           set_of_actions.index(action)] += 1
 
-            if current_action in time_occurrences.keys():
-                previous_occurences = time_occurrences[current_action]
+            if current_action in timestamps_of_previous_events.keys():
+                previous_occurences = timestamps_of_previous_events[current_action]
                 previous_occurences.append(time)
-                time_occurrences[current_action] = previous_occurences
+                timestamps_of_previous_events[current_action] = previous_occurences
             else:
-                time_occurrences[current_action] = [time]
+                timestamps_of_previous_events[current_action] = [time]
 
     mean_time = sum_time / n_time
     return mean_time
 
+def analyze_median_timedistance(rawdata, set_of_actions,timestamp_column,action_column, trace_ID, number_of_traces):
+    all_times = [[[] for i in range(len(set_of_actions))] for j in range(len(set_of_actions))] 
 
-def sort_results(mean_time, actions):
+    for trace in range(1, number_of_traces + 1):
+        timestamps_of_previous_events = {}
+        for event in rawdata[rawdata[trace_ID] == trace].values:
+            current_action = event[action_column]
+            time = event[timestamp_column]
+            time = convert_to_seconds(time)
+
+            for action in timestamps_of_previous_events.keys():
+                for p_time in timestamps_of_previous_events[action]:
+                    all_times[set_of_actions.index(action)][set_of_actions.index(
+                        current_action)].append(abs(time - p_time))
+                    
+                    all_times[set_of_actions.index(current_action)][
+                             set_of_actions.index(action)].append(abs(time - p_time))
+
+            if current_action in timestamps_of_previous_events.keys():
+                previous_occurences = timestamps_of_previous_events[current_action]
+                previous_occurences.append(time)
+                timestamps_of_previous_events[current_action] = previous_occurences
+            else:
+                timestamps_of_previous_events[current_action] = [time]
+
+    medians = np.zeros((len(set_of_actions), len(set_of_actions)))
+    for a1 in range(len(set_of_actions)):
+        for a2 in range(len(set_of_actions)):
+            medians[a1, a2] = stat.median(all_times[a1][a2]) if len(all_times[a1][a2]) > 0 else np.inf
+    print(medians)
+    return medians
+
+
+def sort_results(mean_time, set_of_actions):
     # sort sensor pairs based on average distance
-    l = len(actions)
+    l = len(set_of_actions)
     n = 0
     number_of_pairs = int((l*l)/2-l/2)
     pair_labels = np.zeros((2, number_of_pairs), dtype=int)
@@ -103,42 +134,48 @@ def convert_to_datatime(time):
     return datetime.datetime.fromtimestamp(time).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
 
-def abstract_log(actions1, actions2, newname, rawdata):
+def abstract_log(set_of_actions1, set_of_actions2, newname, rawdata):
     n = 0
     nr_events_abstracted = 0
     for event in rawdata.values:
-        if event[5] == actions1 or event[5] == actions2:
+        if event[5] == set_of_actions1 or event[5] == set_of_actions2:
             nr_events_abstracted += 1
             rawdata.at[n, 'sensor'] = newname
         n += 1
-    actions = list(rawdata.sensor.unique())
-    return rawdata, nr_events_abstracted, actions
+    set_of_actions = list(rawdata.sensor.unique())
+    return rawdata, nr_events_abstracted, set_of_actions
 
 
 if __name__ == '__main__':
 
-    rawdata, actions = read_data("Data.csv")
+    tree_string = ""
+
+    rawdata, set_of_actions = read_data("Data.csv", 6, 8114, "sensor", ";")
     rawdata = delete_repetitions(rawdata)
-    print(rawdata)
     for level_of_abstraction in range(1, 16):
 
         out = False
-        mean_time = analyze_timedistance(rawdata, actions)
+        timedistance = analyze_median_timedistance(rawdata, set_of_actions,3,5,"CaseID",14)
         sorted_pair_array, sorted_pair_labels = sort_results(
-            mean_time, actions)
-        print(f"Now you only have {len(actions)}")
+            timedistance, set_of_actions)
+        print(f"Now you only have {len(set_of_actions)}")
 
         for i in range(len(sorted_pair_array)):
+            
             print("Do you want to abstract:")
-            print(actions[sorted_pair_labels[0, i]] +
-                  "-" + actions[sorted_pair_labels[1, i]])
+            print(set_of_actions[sorted_pair_labels[0, i]] +
+                  "-" + set_of_actions[sorted_pair_labels[1, i]])
             print("The time distance between them is:")
             print(sorted_pair_array[i])
             #print(" Type Yes or No or Stop")
             answer = input(" Type Yes or No or Stop")
             if answer == "Yes":
-                rawdata, nr_events_abstracted, actions = abstract_log(
-                    actions[sorted_pair_labels[0, i]], actions[sorted_pair_labels[1, i]], actions[sorted_pair_labels[0, i]] + "-" + actions[sorted_pair_labels[1, i]], rawdata)
+                e1 = set_of_actions[sorted_pair_labels[0, i]]
+                e2 = set_of_actions[sorted_pair_labels[1, i]]
+                tree_string = tree_string +  e1 + "->" + e1 + e2 + "[label = " + str(level_of_abstraction) + "]" + ";"
+                tree_string = tree_string + e2 + "->" + e1 + e2 + "[label = " + str(level_of_abstraction) + "]"+ ";"
+                rawdata, nr_events_abstracted, set_of_actions = abstract_log(
+                    set_of_actions[sorted_pair_labels[0, i]], set_of_actions[sorted_pair_labels[1, i]], set_of_actions[sorted_pair_labels[0, i]] + set_of_actions[sorted_pair_labels[1, i]], rawdata)
                 print("Abstracted {} Events".format(nr_events_abstracted))
                 print(rawdata)
                 rawdata = delete_repetitions(rawdata)
@@ -152,3 +189,4 @@ if __name__ == '__main__':
                 continue
         if out:
             break
+    print(tree_string)  
