@@ -2,6 +2,11 @@ import pandas as pd
 import numpy as np
 import datetime
 import statistics as stat
+from pm4py.objects.log.util import dataframe_utils
+from pm4py.objects.conversion.log import converter as log_converter
+from pm4py.algo.discovery.heuristics import algorithm as heuristics_miner
+from pm4py.visualization.heuristics_net import visualizer as hn_visualizer
+from pm4py.util import constants
 
 
 def read_data(filename, number_columns, number_rows, event_label_column, separator):
@@ -17,6 +22,7 @@ def analyze_mean_timedistance(rawdata, set_of_actions,timestamp_column,action_co
 
     for trace in range(1, number_of_traces + 1):
         timestamps_of_previous_events = {}
+
         for event in rawdata[rawdata[trace_ID] == trace].values:
             current_action = event[action_column]
             time = event[timestamp_column]
@@ -152,8 +158,8 @@ if __name__ == '__main__':
 
     rawdata, set_of_actions = read_data("Data.csv", 6, 8114, "sensor", ";")
     rawdata = delete_repetitions(rawdata)
+    rawdata.to_csv("Abstraction0.csv")
     for level_of_abstraction in range(1, 16):
-
         out = False
         timedistance = analyze_median_timedistance(rawdata, set_of_actions,3,5,"CaseID",14)
         sorted_pair_array, sorted_pair_labels = sort_results(
@@ -181,6 +187,15 @@ if __name__ == '__main__':
                 rawdata = delete_repetitions(rawdata)
                 rawdata.to_csv("Abstraction" +
                                str(level_of_abstraction) + ".csv")
+                log_csv = dataframe_utils.convert_timestamp_columns_in_df(rawdata)
+                log_csv.rename(columns={'CaseID': 'case'}, inplace=True)
+                parameters = {log_converter.Variants.TO_EVENT_LOG.value.Parameters.CASE_ID_KEY: 'case',
+                              constants.PARAMETER_CONSTANT_ACTIVITY_KEY: "sensor", 
+                              constants.PARAMETER_CONSTANT_TIMESTAMP_KEY: "time:timestamp"}
+                event_log = log_converter.apply(log_csv, parameters=parameters, variant=log_converter.Variants.TO_EVENT_LOG)
+                heu_net = heuristics_miner.apply_heu(event_log, parameters=parameters)
+                gviz = hn_visualizer.apply(heu_net)
+                hn_visualizer.view(gviz)
                 break
             elif answer == "Stop":
                 out = True
