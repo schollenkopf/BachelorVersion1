@@ -10,12 +10,13 @@ from pm4py.util import constants
 
 
 def read_data(filename, number_columns, number_rows, event_label_column, separator):
-    rawdata = pd.read_csv(filename, separator, usecols=range(number_columns), nrows=number_rows)  # More stuff to parametrize
+    rawdata = pd.read_csv(filename, separator, usecols=range(
+        number_columns), nrows=number_rows)  # More stuff to parametrize
     set_of_actions = list(rawdata[event_label_column].unique())
     return rawdata, set_of_actions
 
 
-def analyze_mean_timedistance(rawdata, set_of_actions,timestamp_column,action_column, trace_ID, number_of_traces):
+def analyze_mean_timedistance(rawdata, set_of_actions, timestamp_column, action_column, trace_ID, number_of_traces):
     # watch out for division by 0
     sum_time = np.zeros((len(set_of_actions), len(set_of_actions)))
     n_time = np.zeros((len(set_of_actions), len(set_of_actions)))
@@ -49,8 +50,10 @@ def analyze_mean_timedistance(rawdata, set_of_actions,timestamp_column,action_co
     mean_time = sum_time / n_time
     return mean_time
 
-def analyze_median_timedistance(rawdata, set_of_actions,timestamp_column,action_column, trace_ID, number_of_traces):
-    all_times = [[[] for i in range(len(set_of_actions))] for j in range(len(set_of_actions))] 
+
+def analyze_median_timedistance(rawdata, set_of_actions, timestamp_column, action_column, trace_ID, number_of_traces):
+    all_times = [[[] for i in range(len(set_of_actions))]
+                 for j in range(len(set_of_actions))]
 
     for trace in range(1, number_of_traces + 1):
         timestamps_of_previous_events = {}
@@ -63,9 +66,9 @@ def analyze_median_timedistance(rawdata, set_of_actions,timestamp_column,action_
                 for p_time in timestamps_of_previous_events[action]:
                     all_times[set_of_actions.index(action)][set_of_actions.index(
                         current_action)].append(abs(time - p_time))
-                    
+
                     all_times[set_of_actions.index(current_action)][
-                             set_of_actions.index(action)].append(abs(time - p_time))
+                        set_of_actions.index(action)].append(abs(time - p_time))
 
             if current_action in timestamps_of_previous_events.keys():
                 previous_occurences = timestamps_of_previous_events[current_action]
@@ -77,7 +80,8 @@ def analyze_median_timedistance(rawdata, set_of_actions,timestamp_column,action_
     medians = np.zeros((len(set_of_actions), len(set_of_actions)))
     for a1 in range(len(set_of_actions)):
         for a2 in range(len(set_of_actions)):
-            medians[a1, a2] = stat.median(all_times[a1][a2]) if len(all_times[a1][a2]) > 0 else np.inf
+            medians[a1, a2] = stat.median(all_times[a1][a2]) if len(
+                all_times[a1][a2]) > 0 else np.inf
     print(medians)
     return medians
 
@@ -161,13 +165,14 @@ if __name__ == '__main__':
     rawdata.to_csv("Abstraction0.csv")
     for level_of_abstraction in range(1, 16):
         out = False
-        timedistance = analyze_median_timedistance(rawdata, set_of_actions,3,5,"CaseID",14)
+        timedistance = analyze_median_timedistance(
+            rawdata, set_of_actions, 3, 5, "CaseID", 14)
         sorted_pair_array, sorted_pair_labels = sort_results(
             timedistance, set_of_actions)
         print(f"Now you only have {len(set_of_actions)}")
 
         for i in range(len(sorted_pair_array)):
-            
+
             print("Do you want to abstract:")
             print(set_of_actions[sorted_pair_labels[0, i]] +
                   "-" + set_of_actions[sorted_pair_labels[1, i]])
@@ -178,24 +183,28 @@ if __name__ == '__main__':
             if answer == "Yes":
                 e1 = set_of_actions[sorted_pair_labels[0, i]]
                 e2 = set_of_actions[sorted_pair_labels[1, i]]
-                tree_string = tree_string +  e1 + "->" + e1 + e2 + "[label = " + str(level_of_abstraction) + "]" + ";"
-                tree_string = tree_string + e2 + "->" + e1 + e2 + "[label = " + str(level_of_abstraction) + "]"+ ";"
+                tree_string = tree_string + e1 + "->" + e1 + e2 + \
+                    "[label = " + str(level_of_abstraction) + "]" + ";"
+                tree_string = tree_string + e2 + "->" + e1 + e2 + \
+                    "[label = " + str(level_of_abstraction) + "]" + ";"
                 rawdata, nr_events_abstracted, set_of_actions = abstract_log(
                     set_of_actions[sorted_pair_labels[0, i]], set_of_actions[sorted_pair_labels[1, i]], set_of_actions[sorted_pair_labels[0, i]] + set_of_actions[sorted_pair_labels[1, i]], rawdata)
                 print("Abstracted {} Events".format(nr_events_abstracted))
                 print(rawdata)
                 rawdata = delete_repetitions(rawdata)
-                rawdata.to_csv("Abstraction" +
-                               str(level_of_abstraction) + ".csv")
-                log_csv = dataframe_utils.convert_timestamp_columns_in_df(rawdata)
-                log_csv.rename(columns={'CaseID': 'case'}, inplace=True)
-                parameters = {log_converter.Variants.TO_EVENT_LOG.value.Parameters.CASE_ID_KEY: 'case',
-                              constants.PARAMETER_CONSTANT_ACTIVITY_KEY: "sensor", 
-                              constants.PARAMETER_CONSTANT_TIMESTAMP_KEY: "time:timestamp"}
-                event_log = log_converter.apply(log_csv, parameters=parameters, variant=log_converter.Variants.TO_EVENT_LOG)
-                heu_net = heuristics_miner.apply_heu(event_log, parameters=parameters)
+
+                #log_csv = dataframe_utils.convert_timestamp_columns_in_df(rawdata)
+                parameters = {log_converter.Variants.TO_EVENT_LOG.value.Parameters.CASE_ID_KEY: 'CaseID',
+                              constants.PARAMETER_CONSTANT_ACTIVITY_KEY: "sensor",
+                              constants.PARAMETER_CONSTANT_TIMESTAMP_KEY: "timestamp"}
+                event_log = log_converter.apply(
+                    rawdata, parameters=parameters, variant=log_converter.Variants.TO_EVENT_LOG)
+                heu_net = heuristics_miner.apply_heu(
+                    event_log, parameters=parameters)
                 gviz = hn_visualizer.apply(heu_net)
                 hn_visualizer.view(gviz)
+                rawdata.to_csv("Abstraction" +
+                               str(level_of_abstraction) + ".csv")
                 break
             elif answer == "Stop":
                 out = True
@@ -204,4 +213,4 @@ if __name__ == '__main__':
                 continue
         if out:
             break
-    print(tree_string)  
+    print(tree_string)
