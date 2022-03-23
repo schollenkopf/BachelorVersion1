@@ -38,7 +38,7 @@ def analyze_mean_timedistance(rawdata, set_of_actions, timestamp_column, action_
     return mean_time
 
 
-def analyze_median_timedistance(rawdata, set_of_actions, timestamp_column, action_column, trace_ID, number_of_traces):
+def analyze_median_timedistance(rawdata, set_of_actions, timestamp_column, action_column, trace_ID, number_of_traces, statistic):
     all_times = [[[] for i in range(len(set_of_actions))]
                  for j in range(len(set_of_actions))]
 
@@ -63,10 +63,13 @@ def analyze_median_timedistance(rawdata, set_of_actions, timestamp_column, actio
                 timestamps_of_previous_events[current_action] = previous_occurences
             else:
                 timestamps_of_previous_events[current_action] = [time]
-
     medians = np.zeros((len(set_of_actions), len(set_of_actions)))
     for a1 in range(len(set_of_actions)):
         for a2 in range(len(set_of_actions)):
-            medians[a1, a2] = stat.median(all_times[a1][a2]) if len(
-                all_times[a1][a2]) > 0 else np.inf
+            if statistic == "median":
+                medians[a1, a2] = stat.median(all_times[a1][a2]) if len(
+                    all_times[a1][a2]) > 0 else np.inf
+            if statistic == "stdev":
+                medians[a1, a2] = stat.stdev(all_times[a1][a2]) if len(
+                    all_times[a1][a2]) > 0 else np.inf
     return medians

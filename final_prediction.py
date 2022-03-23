@@ -28,9 +28,20 @@ def sort_results(mean_time, set_of_actions):
     return sorted_pair_array, sorted_pair_labels
 
 
+def max(array):
+    if np.max(array) == np.inf:
+        return np.max(array[array < np.inf])
+    return np.max(array)
+
+
 def predict(rawdata, set_of_actions, timestamp_column, action_column, trace_ID, number_of_traces):
     timedistance = analyze_median_timedistance(
-        rawdata, set_of_actions, timestamp_column, action_column, trace_ID, number_of_traces)
+        rawdata, set_of_actions, timestamp_column, action_column, trace_ID, number_of_traces, "median")
+    timedistance_std = analyze_median_timedistance(
+        rawdata, set_of_actions, timestamp_column, action_column, trace_ID, number_of_traces, "stdev")
+    combined = 0.5 * timedistance / (max(timedistance) - np.min(timedistance)) + \
+        0.5 * timedistance_std / \
+        (max(timedistance_std) - np.min(timedistance_std))
     sorted_pair_array, sorted_pair_labels = sort_results(
-        timedistance, set_of_actions)
+        combined, set_of_actions)
     return sorted_pair_array, sorted_pair_labels
