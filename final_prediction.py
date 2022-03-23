@@ -39,9 +39,7 @@ def predict(rawdata, set_of_actions, timestamp_column, action_column, trace_ID, 
         rawdata, set_of_actions, timestamp_column, action_column, trace_ID, number_of_traces, "median")
     timedistance_std = analyze_median_timedistance(
         rawdata, set_of_actions, timestamp_column, action_column, trace_ID, number_of_traces, "stdev")
-    combined = 0.5 * timedistance / (max(timedistance) - np.min(timedistance)) + \
-        0.5 * timedistance_std / \
-        (max(timedistance_std) - np.min(timedistance_std))
+    combined = (timedistance / (max(timedistance) - np.min(timedistance))) * (timedistance_std / (max(timedistance_std) - np.min(timedistance_std)))
     sorted_pair_array, sorted_pair_labels = sort_results(
         combined, set_of_actions)
     return sorted_pair_array, sorted_pair_labels
